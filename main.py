@@ -3,6 +3,7 @@ from tkinter import messagebox
 import random
 import pyperclip 
 import json
+
 # ---------------------------- PASSWORD SEARCH ------------------------------- #
 def find_password():
     website = website_input.get()
@@ -14,10 +15,10 @@ def find_password():
     else:
         if website in data:
             email = data[website]['email/username']
-            password = data[website]['password']
+            encrypted_password = data[website]['password']
             messagebox.showinfo(title="Email/Password", message=
                                 f"Email: {email}\n"
-                                f"Password: {password}"
+                                f"Password: {encrypted_password}"
                                 )
         else:
             messagebox.showinfo(title="No info found", message=f"No details for the {website} exists.")
@@ -43,8 +44,6 @@ def generate_password():
     password_input.insert(0, password)
     pyperclip.copy(password)
 # ---------------------------- SAVE PASSWORD ------------------------------- #
-entries_set = set()
-
 def add_entry():
     # Getting input data
     website = website_input.get()
@@ -56,39 +55,52 @@ def add_entry():
         }
     }
 
-    # Empty fields
+    # empty fields
     if website.strip() == "" or username.strip() == "" or password.strip() == "":
         messagebox.showinfo(title="Missing Input", message="Please don't leave any fields empty!")
+        return
+
+    try:
+        with open("data.json", "r") as d:
+            json.load(d)
+    except FileNotFoundError:
+        with open("data.json", "w") as d:
+            json.dump(new_data, encrypted, indent=4)
 
     # Check for duplicates
-    if (website, username) in entries_set:
-        messagebox.showinfo(title="Duplicate Entry", message="This combination of website and username already exists.")
-    else:
-        entries_set.add((website, username))
-        is_ok = messagebox.askyesno(title=website, message=f"These are the details entered: \nEmail: {username} "
-                                    f"\nPassword: {password} \nIs it okay to save?")
-        if is_ok:
-            try:
-                with open("data.json", "r") as data_file:
-                    # Reading old data
-                    data = json.load(data_file)
-            except FileNotFoundError:
-                    with open("data.json", "w") as data_file:
-                        json.dump(new_data, data_file, indent=4)
+    with open("data.json", "r") as data_file:
+        data = json.load(data_file)
+        if website in data and username == data[website]["email/username"]:
+            is_edit = messagebox.askyesno(title="Duplicate Entry",
+                                          message="This combination of website and username already exists. Do you "
+                                                  "want to edit it?")
+            if is_edit:
+                try:
+                    with open("data.json", "r") as d:  # loading data
+                        json.load(d)
+                except FileNotFoundError:  # if data file not found create new data file
+                    with open("data.json", "w") as d:
+                        json.dump(new_data, d, indent=4)
+                else:
+                    # update the existing entry
+                    data.update(new_data)
+                    with open("data.json", 'w') as d:
+                        json.dump(data, d, indent=4)
             else:
-                # Updating old data with new data
+                website_input.delete(0, "end")
+                username_input.delete(0, "end")
+                password_input.delete(0, "end")
+                return
+        else:
+            with open("data.json", "w") as d:
                 data.update(new_data)
-                data_file.close()
-                with open("data.json", "w") as data_file:
-                    # Saving updated data
-                    json.dump(data, data_file, indent=4)
+                # saving updated data
+                json.dump(data, d, indent=4)
 
-            website_input.delete(0, "end")
-            username_input.delete(0, "end")
-            password_input.delete(0, "end")
-
+    website_input.delete(0, "end")
+    username_input.delete(0, "end")
+    password_input.delete(0, "end")
 # ---------------------------- UI SETUP ------------------------------- #
-
 window = Tk()
 window.title("Password Manager")
 window.config(padx=50, pady=50)
